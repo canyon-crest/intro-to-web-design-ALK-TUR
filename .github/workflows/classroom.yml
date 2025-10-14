@@ -1,0 +1,68 @@
+name: Autograding Tests
+on:
+  - push
+  - workflow_dispatch
+  - repository_dispatch
+permissions:
+  checks: write
+  actions: read
+  contents: read
+jobs:
+  run-autograding-tests:
+    runs-on: ubuntu-latest
+    if: github.actor != 'github-classroom[bot]'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # Test 1: index.html contains "</a>" at least 3 times
+    - name: Count closing anchor tags
+      id: a-close-tag
+      uses: classroom-resources/autograding-io-grader@v1
+      with:
+        test-name: "</a> appears ≥ 3 times in index.html"
+        command: |
+          bash -lc 'c=0; [[ -f index.html ]] && c=$(grep -o "</a>" index.html | wc -l || true); \
+          if [[ $c -ge 3 ]]; then echo PASS; else echo "FAIL ($c)"; fi'
+        expected-output: "PASS"
+        comparison-method: exact
+        timeout: 2
+        max-score: 1
+
+    # Test 2: index.html contains "<img " at least 3 times
+    - name: Count img tags
+      id: img-tag
+      uses: classroom-resources/autograding-io-grader@v1
+      with:
+        test-name: "<img (with space) appears ≥ 3 times in index.html"
+        command: |
+          bash -lc 'c=0; [[ -f index.html ]] && c=$(grep -o "<img " index.html | wc -l || true); \
+          if [[ $c -ge 3 ]]; then echo PASS; else echo "FAIL ($c)"; fi'
+        expected-output: "PASS"
+        comparison-method: exact
+        timeout: 2
+        max-score: 1
+
+    # Test 3: at least 3 files inside /images (top level)
+    - name: Check images folder file count
+      id: images-folder
+      uses: classroom-resources/autograding-io-grader@v1
+      with:
+        test-name: "images/ contains ≥ 3 files (not counting subfolders)"
+        command: |
+          bash -lc 'if [[ -d images ]]; then n=$(find images -maxdepth 1 -type f | wc -l || true); \
+          else n=0; fi; \
+          if [[ $n -ge 3 ]]; then echo PASS; else echo "FAIL ($n)"; fi'
+        expected-output: "PASS"
+        comparison-method: exact
+        timeout: 2
+        max-score: 1
+
+    - name: Autograding Reporter
+      uses: classroom-resources/autograding-grading-reporter@v1
+      env:
+        A-CLOSE-TAG_RESULTS: "${{ steps.a-close-tag.outputs.result }}"
+        IMG-TAG_RESULTS: "${{ steps.img-tag.outputs.result }}"
+        IMAGES-FOLDER_RESULTS: "${{ steps.images-folder.outputs.result }}"
+      with:
+        runners: a-close-tag,img-tag,images-folder
